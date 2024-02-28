@@ -1,0 +1,58 @@
+import hashlib
+from Crypto.Cipher import AES
+from Crypto.Random import get_random_bytes
+
+class SecureChat:
+    def __init__(self):
+        self.users = {}  # Store username-password pairs
+        self.messages = {}  # Store messages for each user
+
+    def register(self, username, password):
+        if username in self.users:
+            return False  # User already exists
+        self.users[username] = hashlib.sha256(password.encode()).hexdigest()
+        self.messages[username] = []
+        return True
+
+    def login(self, username, password):
+        hashed_password = hashlib.sha256(password.encode()).hexdigest()
+        return self.users.get(username) == hashed_password
+
+    def send_message(self, sender, receiver, message):
+        if receiver not in self.users or sender not in self.users:
+            return False  # Invalid sender or receiver
+        encrypted_message = self._encrypt_message(message)
+        self.messages[receiver].append((sender, encrypted_message))
+        return True
+
+    def receive_messages(self, username):
+        return self.messages.get(username, [])
+
+    def _encrypt_message(self, message):
+        key = get_random_bytes(16)  # Generate a random 128-bit key
+        cipher = AES.new(key, AES.MODE_EAX)
+        nonce = cipher.nonce
+        ciphertext, tag = cipher.encrypt_and_digest(message.encode())
+        return key, nonce, ciphertext, tag
+
+    def _decrypt_message(self, key, nonce, ciphertext, tag):
+        cipher = AES.new(key, AES.MODE_EAX, nonce=nonce)
+        decrypted_message = cipher.decrypt_and_verify(ciphertext, tag)
+        return decrypted_message.decode()
+
+# Example usage
+secure_chat = SecureChat()
+
+# Register users
+secure_chat.register("user1", "password1")
+secure_chat.register("user2", "password2")
+
+# Login
+print("User1 login:", secure_chat.login("user1", "password1"))  # True
+print("User2 login:", secure_chat.login("user2", "wrong_password"))  # False
+
+# Send and receive messages
+secure_chat.send_message("user1", "user2", "Hello from user1!")
+secure_chat.send_message("user2", "user1", "Hello from user2!")
+print("User1 messages:", secure_chat.receive_messages("user1"))
+print("User2 messages:", secure_chat.receive_messages("user2"))
